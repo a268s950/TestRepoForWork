@@ -1,3 +1,7 @@
+-- 7/24/2018
+--Excercise 1: disjunction and negation completed
+--Excercise 2: needs to be started: add mult and div to ABE
+
 {-# LANGUAGE GADTs #-}
 
 -- Imports for QuickCheck
