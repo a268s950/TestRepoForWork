@@ -27,6 +27,7 @@ import Text.ParserCombinators.Parsec.Token
 
 data AE where
   Num :: Int -> AE
+<<<<<<< HEAD
   BinOp :: Eq Int => (Int -> Int -> Int) -> AE -> AE -> AE
   Mult :: AE -> AE -> AE
   Div :: AE -> AE -> AE
@@ -37,10 +38,20 @@ instance Show AE where
   show (Mult a b) = "Mult" ++ " (" ++ (show a) ++ ")" ++ " (" ++ (show b) ++ ")"
   show (Div a b) = "Div" ++ " (" ++ (show a) ++ ")" ++ " (" ++ (show b) ++ ")"
   show (If0 a b c) = "If0" ++ " (" ++ (show a) ++ ")" ++ " (" ++ (show b) ++ ")" ++ " (" ++ (show c) ++ ")"
+=======
+  Plus :: AE -> AE -> AE
+  Minus :: AE -> AE -> AE
+  Mult :: AE -> AE -> AE
+  Div :: AE -> AE -> AE
+  If0 :: AE -> AE -> AE -> AE
+  deriving (Show,Eq)
+
+>>>>>>> f92851d387c362fe7ca76397466d418c8bc96591
 -- Lift a function over integers into Num
 
 liftNum :: (Int -> Int -> Int) -> AE -> AE -> AE
 liftNum f (Num l) (Num r) = (Num (f l r))
+<<<<<<< HEAD
 BinOp (+) t1 t2 = (Main.+) t1 t2
 BinOp (-) t3 t4 = (Main.-) t3 t4
 
@@ -49,6 +60,16 @@ BinOp (-) t3 t4 = (Main.-) t3 t4
 pprintAE :: AE -> String
 pprintAE (Num n) = show n
 pprintAE (BinOp op t1 t2) = "(" ++ pprintAE t1 ++ "+-" ++ pprintAE t2 ++ ")"
+=======
+
+-- AST Pretty Printer
+-- Prints concrete syntax from abstract syntax
+
+pprintAE :: AE -> String
+pprintAE (Num n) = show n
+pprintAE (Plus n m) = "(" ++ pprintAE n ++ "+" ++ pprintAE m ++ ")"
+pprintAE (Minus n m) = "(" ++ pprintAE n ++ "-" ++ pprintAE m ++ ")"
+>>>>>>> f92851d387c362fe7ca76397466d418c8bc96591
 pprintAE (Mult n m) = "(" ++ pprintAE n ++ "*" ++ pprintAE m ++ ")"
 pprintAE (Div n m) = "(" ++ pprintAE n ++ "/" ++ pprintAE m ++ ")"
 pprintAE (If0 c t e) = "(if0 " ++ pprintAE c ++ " then " ++ pprintAE t ++ " else " ++ pprintAE e ++ ")"
@@ -88,8 +109,13 @@ expr = buildExpressionParser operators term
 operators = [
   [ inFix "*" Mult AssocLeft
     , inFix "/" Div AssocLeft ]
+<<<<<<< HEAD
   , [ inFix "+" (BinOp (Main.+)) AssocLeft
   , inFix "-" (BinOp (Main.-)) AssocLeft ]
+=======
+  , [ inFix "+" Plus AssocLeft
+  , inFix "-" Minus AssocLeft ]
+>>>>>>> f92851d387c362fe7ca76397466d418c8bc96591
   ]
   
 numExpr :: Parser AE
@@ -122,12 +148,21 @@ parseAEFile = parseFile expr
 
 eval :: AE -> Maybe AE
 eval (Num x) = return (Num x)
+<<<<<<< HEAD
 eval (BinOp op t1 t2) = do v1 <- (eval t1)
                        	   v2 <- (eval t2)
                        	   return (liftNum (Prelude.+) v1 v2)
 eval (BinOp op t1 t2) = do v1 <- (eval t1)
                            v2 <- (eval t2)
                            return (liftNum (Prelude.-) v1 v2)
+=======
+eval (Plus t1 t2) = do v1 <- (eval t1)
+                       v2 <- (eval t2)
+                       return (liftNum (+) v1 v2)
+eval (Minus t1 t2) = do v1 <- (eval t1)
+                        v2 <- (eval t2)
+                        return (liftNum (-) v1 v2)
+>>>>>>> f92851d387c362fe7ca76397466d418c8bc96591
 eval (Mult t1 t2) = do v1 <- (eval t1)
                        v2 <- (eval t2)
                        return (liftNum (*) v1 v2)
@@ -140,3 +175,68 @@ eval (If0 t1 t2 t3) = do v1 <- (eval t1)
 -- Interpreter = parse + eval
 
 interp = eval . parseAE
+<<<<<<< HEAD
+=======
+
+-- Testing (Requires QuickCheck 2)
+
+-- Arbitrary AST Generator
+
+instance Arbitrary AE where
+  arbitrary =
+    sized $ \n -> genAE ((rem n 10) + 10)
+
+genNum =
+  do t <- choose (0,100)
+     return (Num t)
+
+genPlus n =
+  do s <- genAE n
+     t <- genAE n
+     return (Plus s t)
+
+genMinus n =
+  do s <- genAE n
+     t <- genAE n
+     return (Minus s t)
+
+genMult n =
+  do s <- genAE n
+     t <- genAE n
+     return (Minus s t)
+
+genDiv n =
+  do s <- genAE n
+     t <- genAE n
+     return (Mult s t)
+
+genIf n =
+  do c <- genAE n
+     t <- genAE n
+     e <- genAE n
+     return (If0 c t e)
+
+genAE :: Int -> Gen AE
+genAE 0 =
+  do term <- genNum
+     return term
+genAE n =
+  do term <- oneof [genNum
+                   , (genPlus (n-1))
+                   , (genMinus (n-1))
+                   , (genMult (n-1))
+                   , (genDiv (n-1))
+                   , (genIf (n-1))]
+     return term
+
+-- QuickCheck 
+
+testParseAE :: Int -> IO ()
+testParseAE n = quickCheckWith stdArgs {maxSuccess=n}
+  (\t -> parseAE (pprintAE t) == t)
+
+testInterpAE :: Int -> IO ()
+testInterpAE n = quickCheckWith stdArgs {maxSuccess=n}
+  (\t -> (interp $ pprintAE t) == (eval t))
+
+>>>>>>> f92851d387c362fe7ca76397466d418c8bc96591
