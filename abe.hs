@@ -367,6 +367,16 @@ genNot n =
   do s <- genABE n 
      return (Not s)
 
+genDiv n =
+  do s <- genABE n
+     t <- genABE n
+     return (Div s t)
+
+genMult n =
+  do s <- genABE n
+     t <- genABE n
+     return (Mult s t)
+
 genABE :: Int -> Gen ABE
 genABE 0 = 
   do term <- oneof [genNum,genBool]
@@ -425,7 +435,7 @@ testErrThenTyped n =
            case (interpErr t') of
              (Just v) -> (Just v) == interpTyped t'
              Nothing -> True)
-               
+
 testTypedThenErr :: Int -> IO ()
 testTypedThenErr n =
   quickCheckWith stdArgs {maxSuccess=n}
@@ -438,4 +448,3 @@ interpTypedM :: String -> Maybe ABE
 interpTypedM s = do ast <- return (parseABE s)
                     typeof ast 
                     (eval ast)
-                
