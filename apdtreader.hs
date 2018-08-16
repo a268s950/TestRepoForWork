@@ -1,128 +1,14 @@
 import Control.Monad
 import Control.Applicative
 
-
-data Idt = Id Int
-data P = Place Int
-data T a = Var (Idt)
---each p (- P corresponds to an attestation                   ---manager and consists of a unique private                    ---key: p = (policy,k^-1 (subscript p))
-         | Seqt T T
-	 | Part T T
-	 | Att P T
-	 | SIGt
-	 | KIMt P
-	 | USMt
-    deriving(Show,Eq)
-data E = Seqe E E
-       | Pare E E
-       | sigma?
-       | Ep
-       | Kime P Place
-       | Usme P
-       | N P
-
-
-
-
-type Env = [(String, FBAEVal)]
---type Env = [(String,Int)]
-
-instance Functor (Reader e) where
-  fmap = liftM
-
-instance Applicative (Reader e) where
-  pure = return
-  (<*>) = ap
-
-instance Monad (Reader e) where
-  return x = Reader $ \e -> x
-  g >>= f = Reader $ \e -> runR (f (runR g e)) e
-
-evalM :: FBAE -> Reader Env FBAEVal
-evalM (Num x) = return (NumV x)
-evalM (Plus l r) = do { (NumV l') <- (evalM l) ;
-                        (NumV r') <- (evalM r) ;
-                        return (NumV (l'+r')) }
-evalM (Minus l r) = do { (NumV l') <- (evalM l) ;
-                         (NumV r') <- (evalM r) ;
-                         return (NumV (l'-r')) }
---evalM env (Bind i v b) = do { v' <- evalM v ;
---                              evalM ((i,v'):env) b }
-evalM (Bind i v b) = do { v' <- evalM v ;
-                          local (addVar i v') (evalM b) }
---evalM env (App f a) = do { (Lambda i b) <- (evalM env f) ;
---                           a' <- (evalM env a) ;
---                           evalM ((i,a'):env) b }
---evalM (App f a) = do { (ClosureV i b e) <-( evalM f);
---                       a' <- evalM a;
---		       local (useClosure i a' e) (evalM b) }
---evalM (Id id) = do { env <- ask ;
---                     return case (lookup id env) of
---  
-evalM (Lambda i t b) = do { env <- ask;
-                       return (ClosureV i b env) }
-evalM (App f a) = do { (ClosureV i b e) <-( evalM f);
-                       a' <- evalM a;
-                       local (useClosure i a' e) (evalM b) }
-evalM (Id id) = do { env <- ask;
-                     return (lookupName id env)
-                   }
---evalM env (If c t e) = do { (Num c') <- (evalM env c) ;
---                            if c'==0 then (evalM env t) else (evalM env e)}
-
-addVar :: String -> FBAEVal -> Env -> Env
-addVar s i e = (s,i):e
-
-useClosure :: String -> FBAEVal -> Env -> Env -> Env
-useClosure i v e _ = (i,v):e
-
-data FBAE = Num Int |
-            Plus FBAE FBAE |
-            Minus FBAE FBAE |
-            Bind String FBAE FBAE |
-            Lambda String FBAETy FBAE |
-            App FBAE FBAE |
-            Id String
-          deriving (Show, Eq)
-
-data FBAETy = TNum |
-              TBool |
-              TFunc FBAETy FBAETy
-            deriving (Show, Eq)
-
-data FBAEVal = NumV Int |
-               ClosureV String FBAE Env
-             deriving (Show,Eq)
-
+--from document "the typing environment....
+--can be viewed as a list of (identifier,type) pairs"
+type Env = [(Id, E)]
 {-
-data FBAE where
-  Num :: Int -> FBAE
-  Plus :: FBAE -> FBAE -> FBAE
-  Minus :: FBAE -> FBAE -> FBAE
-  Bind :: String -> FBAE -> FBAE -> FBAE
-  Lambda :: String -> FBAETy -> FBAE -> FBAE
-  App :: FBAE -> FBAE -> FBAE
-  Id :: String -> FBAE
-  If :: FBAE -> FBAE -> FBAE -> FBAE
-  deriving (Show, Eq)
-
-data FBAETy where
-  TNum :: FBAETy
-  TFun :: FBAETy -> FBAETy -> FBAETy
-  deriving (Show,Eq)
-
-data FBAEVal where
-  NumV :: Int -> FBAEVal
-  ClosureV :: String -> FBAE -> Env -> FBAEVal
-  deriving (Show,Eq)
--}
 data Reader e a = Reader (e -> a)
 
 runR :: Reader e a -> e -> a
 runR (Reader f) e = f e
-
---g >>= f :: M a -> (a -> M b) -> M b
---g >>= f = Reader $ \e -> runR (f (runR g e)) e
 
 ask :: Reader a a
 ask = Reader $ \e -> e
@@ -130,12 +16,98 @@ ask = Reader $ \e -> e
 asks :: (e -> a) -> Reader e a
 asks f = ask >>= \e -> (return (f e))
 
-lookupName :: String -> Env -> FBAEVal
+lookupName :: String -> Env -> APDT
 lookupName s e = case (lookup s e) of
                    Just x -> x
                    Nothing -> error "name not found"
 
---useClosure creates a new environment by adding the new binding --needed for evaluating App to the environment from the closure
-
 local :: (e -> t) -> Reader t a -> Reader e a
 local f r = ask >>= \e -> return (runR r (f e))
+
+--useClosure creates a new environment by adding the new binding
+--needed for evaluating App to the environment from the closure
+useClosure :: String -> APDT -> Env -> Env -> Env
+useClosure i v e _ = (i,v):e
+
+instance Functor (Reader e) where
+  fmap = liftM
+
+instance Applicative (Reader e) where
+  pure = return
+    (<*>) = ap
+
+instance Monad (Reader e) where
+  return x = Reader $ \e -> x
+    g >>= f = Reader $ \e -> runR (f (runR g e)) e
+-}
+--type Id = String
+data Id = IdConstructor Int
+    deriving(Show,Eq)
+
+--type Place = Int
+data P = Place Int
+    deriving(Show,Eq)
+--USM and KIM are parameterized with Strings
+--not much different
+--usm talks to the same attestation manager,
+--kim talks to another place
+
+data APDT = Val E
+          | Var Id
+          | LN APDT APDT --Sequential
+          | BR APDT APDT --Parallel
+          | At P APDT  
+          | App APDT APDT
+          | Lambda E APDT
+          | SIG     --Signature term (can be seen as a function)
+          | KIM P   
+          | USM
+    deriving(Show,Eq)
+data E = SS E E
+       | PP E E
+       | Epsilon  --empty
+       | Sig E P  --created from SIG turning
+                  --prior evidence into Sig 
+       | Kim P P 
+       | Usm P   
+       | N P
+    deriving(Show,Eq) 
+data BigE = LNE BigE BigE
+          | BRE BigE BigE
+          | SigE BigE P
+          | KimE P
+          | UsmE P
+          | NE P
+    deriving(Show,Eq)
+data T = Idk BigE
+       | Function T T
+-- Principle Rules --
+
+eval :: Env -> APDT -> P -> E
+eval env t p = case t of
+                 KIM q    -> Kim q p
+                 USM      -> Usm p
+                 LN t0 t1 -> let t0' = eval env t0 p in
+                             let t1' = eval env t1 p in
+                             (SS t0' t1')
+--                 BR t0 t1 -> let t0' = eval env t0 p in
+--                             let t1' = eval env t1 p in
+--                             PP t0' t1
+                 Val e    -> Epsilon -- i can't remember what this is supposed to be
+                 Var i    -> case (lookup i env) of --variable evaluation
+                             Just v  -> v
+                             Nothing -> error "bad"         
+--		 LN t0 t1 -> case (isValid t0) of
+--                             True -> case (isValid t1) of
+--                                       True  -> return (LN t0' t1, p)
+--                                       False -> return ()
+--               	             False -> return ()
+--               BR t0 t1 -> 
+
+                 
+                 
+--addVar :: String -> APDT -> Env -> Env
+--addVar s i e = (s,i):e
+
+testVal = Kim (Place 1) (Place 2)
+myEnv = [(IdConstructor 1,testVal)]
